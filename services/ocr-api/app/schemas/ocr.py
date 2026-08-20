@@ -5,3 +5,8 @@ class DocumentUploadResponse(BaseModel):
     filename: str
     content_type: str
     status: str
+
+class DocumentClassificationResponse(BaseModel):
+    document_id: str
+    document_type: str
+    confidence: float
