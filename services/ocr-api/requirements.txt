@@ -8,3 +8,5 @@ httpx
 torch
 transformers
 pillow
+torchvision
+pymupdf
