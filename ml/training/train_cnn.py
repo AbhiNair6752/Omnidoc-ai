@@ -1,7 +1,9 @@
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
+import mlflow
+import mlflow.pytorch
 
 from ml.models.cnn_model import CNNModel
 
@@ -41,22 +43,51 @@ device = torch.device(
 
 print(f"Using device: {device}")
 
-transform = transforms.ToTensor()
+train_transform = transforms.Compose([
+    transforms.RandomRotation(10),
+    transforms.RandomAffine(
+        degrees=0,
+        translate=(0.1,0.1)
+    ),
+    transforms.ToTensor()
+])
+
+evaluation_transform = transforms.ToTensor()
 
 full_train_dataset = datasets.MNIST(
     root = "ml/datasets",
     train = True,
     download = True,
-    transform = transform
+    transform = train_transform
 )
 
-train_size = 50_000
-validation_size = 10_000
+validation_dataset_full = datasets.MNIST(
+    root = "ml/datasets",
+    train=True,
+    download=True,
+    transform=evaluation_transform
+)
 
-train_dataset, validation_dataset = random_split(
+generator =  torch.Generator().manual_seed(42)
+
+indices = torch.randperm(
+    len(full_train_dataset),
+    generator=generator
+)
+
+train_indices = indices[:50000]
+validation_indices = indices[50000:]
+
+train_dataset = Subset(
     full_train_dataset,
-    [train_size, validation_size]
+    train_indices
 )
+
+validation_dataset = Subset(
+    validation_dataset_full,
+    validation_indices
+)
+
 print(f"Training samples: {len(train_dataset)}")
 print(f"Validation samples:{len(validation_dataset)}")
 
@@ -64,7 +95,7 @@ test_dataset = datasets.MNIST(
     root = "ml/datasets",
     train = False,
     download = True,
-    transform = transform
+    transform = evaluation_transform
 )
 
 train_loader = DataLoader(
@@ -94,13 +125,26 @@ optimizer = torch.optim.Adam(
     lr=LEARNING_RATE
 )
 
-for epoch in range(EPOCHS):
+mlflow.set_experiment ("Omnidoc_MNIST_CNN")
 
-    model.train()
+with mlflow.start_run():
 
-    running_loss = 0.0
+    mlflow.log_params({
+        "epochs": EPOCHS,
+        "batch_size": BATCH_SIZE,
+        "learning_rate": LEARNING_RATE,
+        "dropout": 0.5,
+        "batch_norm": True,
+        "augmentation": True
+    })
 
-    for images, labels in train_loader:
+    for epoch in range(EPOCHS):
+
+       model.train()
+
+       running_loss = 0.0
+
+       for images, labels in train_loader:
 
         images = images.to(device)
         labels = labels.to(device)
@@ -117,20 +161,32 @@ for epoch in range(EPOCHS):
 
         running_loss += loss.item()
 
-    average_loss = running_loss / len(train_loader)
+       average_loss = running_loss / len(train_loader)
 
-    validation_accuracy = evaluate_model(
+       validation_accuracy = evaluate_model(
         model,
         validation_loader,
         device
-    )
+       )
 
-    print(
+       mlflow.log_metric(
+          "training_loss",
+          average_loss,
+          step = epoch + 1
+       )
+
+       mlflow.log_metric(
+          "validation_accuracy",
+          validation_accuracy,
+          step=epoch + 1
+       )
+
+       print(
         f"Epoch [{epoch + 1}/{EPOCHS}] "
         f"Loss: {average_loss:.4f}"
         f"Validation accuracy:"
         f"{validation_accuracy * 100:.2f}%"
-    )
+      )
 
 
 
@@ -140,6 +196,11 @@ accuracy = evaluate_model(
     device
 )
 
+mlflow.log_metric(
+   "test_accuracy",
+   accuracy
+)
+
 print(
     f"Test Accuracy: {accuracy * 100:.2f}%"
 )
@@ -147,6 +208,15 @@ print(
 torch.save(
     model.state_dict(),
     "ml/models/cnn_mnist_model.pth"
+)
+
+"""mlflow.log_artifact(
+   "ml/models/cnn_mnist_model.pth"
+)"""
+
+mlflow.pytorch.log_model(
+   model,
+   name="mnist_cnn_model"
 )
 
 

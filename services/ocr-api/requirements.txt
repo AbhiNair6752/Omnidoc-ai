@@ -10,3 +10,4 @@ transformers
 pillow
 torchvision
 pymupdf
+mlflow
