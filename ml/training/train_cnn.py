@@ -4,8 +4,12 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 import mlflow
 import mlflow.pytorch
+from mlflow.models import infer_signature
+import numpy as np
+from mlflow.types import Schema, TensorSpec
+from mlflow.models import ModelSignature
 
-from ml.models.cnn_model import CNNModel
+from ml.models.cnn_model import CNN
 
 def evaluate_model(model, test_loader, device):
 
@@ -37,28 +41,50 @@ BATCH_SIZE = 64
 LEARNING_RATE = 0.001
 EPOCHS = 5
 
+USE_DROPOUT = True
+USE_BATCH_NORM = True
+USE_AUGMENTATION = False
+
 device = torch.device(
     "cuda" if torch.cuda.is_available() else "cpu"
 )
 
 print(f"Using device: {device}")
 
-train_transform = transforms.Compose([
-    transforms.RandomRotation(10),
-    transforms.RandomAffine(
+if USE_AUGMENTATION:
+     transform = transforms.Compose([
+     transforms.RandomRotation(10),
+     transforms.RandomAffine(
         degrees=0,
         translate=(0.1,0.1)
     ),
-    transforms.ToTensor()
+    transforms.ToTensor(),
+    transforms.Normalize(
+        (0.1307,),
+        (0.3081,)
+    )
 ])
 
-evaluation_transform = transforms.ToTensor()
+else:
+
+   transform = transforms.Compose([
+      transforms.ToTensor(),
+      transforms.Normalize((0.1307,), (0.3081,))
+   ])
+
+evaluation_transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize(
+        (0.1307,),
+        (0.3081,)
+    )
+])
 
 full_train_dataset = datasets.MNIST(
     root = "ml/datasets",
     train = True,
     download = True,
-    transform = train_transform
+    transform = transform
 )
 
 validation_dataset_full = datasets.MNIST(
@@ -116,7 +142,12 @@ test_loader = DataLoader(
     shuffle=False
 )
 
-model = CNNModel().to(device)
+model = CNN(
+   use_dropout=USE_DROPOUT,
+   use_batch_norm = USE_BATCH_NORM
+)
+
+model = model.to(device)
 
 criterion = nn.CrossEntropyLoss()
 
@@ -125,17 +156,24 @@ optimizer = torch.optim.Adam(
     lr=LEARNING_RATE
 )
 
+best_validation_accuracy = 0.0
+best_model_state = None
+
+
+
 mlflow.set_experiment ("Omnidoc_MNIST_CNN")
 
-with mlflow.start_run():
+with mlflow.start_run(
+   run_name = "CNN_BN_Dropout_No_Augmentation"
+):
 
     mlflow.log_params({
         "epochs": EPOCHS,
         "batch_size": BATCH_SIZE,
         "learning_rate": LEARNING_RATE,
         "dropout": 0.5,
-        "batch_norm": True,
-        "augmentation": True
+        "batch_norm": USE_BATCH_NORM,
+        "augmentation": USE_AUGMENTATION
     })
 
     for epoch in range(EPOCHS):
@@ -169,6 +207,21 @@ with mlflow.start_run():
         device
        )
 
+       if validation_accuracy > best_validation_accuracy:
+
+           best_validation_accuracy = validation_accuracy
+
+           best_model_state = {
+               key: value.cpu().clone()
+               for key, value in model.state_dict().items()
+           }
+
+           print(
+               f"New best model found!"
+               f"validation accuracy:"
+               f"{best_validation_accuracy * 100: .2f}%"
+           )
+
        mlflow.log_metric(
           "training_loss",
           average_loss,
@@ -188,36 +241,64 @@ with mlflow.start_run():
         f"{validation_accuracy * 100:.2f}%"
       )
 
+    model.load_state_dict(
+        best_model_state
+    )
 
-
-accuracy = evaluate_model(
+    model = model.to(device)
+    
+    accuracy = evaluate_model(
     model,
     test_loader,
     device
-)
+    )
 
-mlflow.log_metric(
-   "test_accuracy",
-   accuracy
-)
+    mlflow.log_metric(
+      "test_accuracy",
+       accuracy
+    )
+ 
+    print(
+       f"Test Accuracy: {accuracy * 100:.2f}%"
+    )
 
-print(
-    f"Test Accuracy: {accuracy * 100:.2f}%"
-)
+    torch.save(
+      model.state_dict(),
+      "ml/models/cnn_mnist_model.pth"
+    )
 
-torch.save(
-    model.state_dict(),
-    "ml/models/cnn_mnist_model.pth"
-)
+    example_image, _ =  test_dataset[0]
 
-"""mlflow.log_artifact(
-   "ml/models/cnn_mnist_model.pth"
-)"""
+    example_input = (
+        example_image
+        .unsqueeze(0)
+        .to(device)
+    )
 
-mlflow.pytorch.log_model(
-   model,
-   name="mnist_cnn_model"
-)
+    signature = ModelSignature(
+        inputs=Schema([
+            TensorSpec(
+                np.dtype("float32"),
+                (-1, 1, 28, 28)
+            )
+        ]),
+        outputs=Schema([
+            TensorSpec(
+                np.dtype("float32"),
+                (-1, 10)
+            )
+        ])
+    )
+
+    mlflow.pytorch.log_model(
+      model,
+      name="mnist_cnn_model",
+      input_example=example_input,
+      signature=signature
+    )
 
 
-print("CNN model saved successfully.")
+    print("CNN model logged to MLflow successfully.")
+
+
+
