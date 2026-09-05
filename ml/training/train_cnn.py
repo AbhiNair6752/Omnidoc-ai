@@ -43,7 +43,7 @@ EPOCHS = 5
 
 USE_DROPOUT = True
 USE_BATCH_NORM = True
-USE_AUGMENTATION = False
+USE_AUGMENTATION = True
 
 device = torch.device(
     "cuda" if torch.cuda.is_available() else "cpu"
@@ -246,7 +246,7 @@ with mlflow.start_run(
     )
 
     model = model.to(device)
-    
+
     accuracy = evaluate_model(
     model,
     test_loader,
