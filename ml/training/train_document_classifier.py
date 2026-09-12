@@ -34,7 +34,7 @@ print(f"Using device: {device}")
 train_transform = transforms.Compose([
     transforms.Lambda(
         lambda image: image.convert("RGB")
-    )
+    ),
     transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
     transforms.ToTensor(),
     transforms.Normalize(

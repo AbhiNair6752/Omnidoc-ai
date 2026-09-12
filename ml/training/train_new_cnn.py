@@ -12,7 +12,7 @@ from ml.models.cnn_model import CNN
 
 BATCH_SIZE=32
 LEARNING_RATE=0.001
-EPOCHS=10
+EPOCHS=2
 
 NUM_CLASSES=16
 
@@ -73,7 +73,7 @@ evaluate_transform = transforms.Compose([
 ])
 
 dataset = load_dataset(
-    "ucf-crcv/rvl-cdip"
+    "hf-tuner/rvl-cdip-document-classification"
 )
 
 full_dataset = dataset["train"]
@@ -327,7 +327,7 @@ with mlflow.start_run(
     )
 
 
-    example_image, _ = full_dataset[0]
+    example_image, _ = full_dataset[0]["image"]
 
     example_image = example_image.convert("L")
 

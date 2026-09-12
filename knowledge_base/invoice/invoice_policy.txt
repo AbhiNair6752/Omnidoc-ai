@@ -1,0 +1,35 @@
+INVOICE PROCESSING POLICY
+
+Document Type: Invoice
+
+Rule 1:
+Every invoice must contain an invoice number.
+
+Rule 2:
+Every invoice must contain an invoice date.
+
+Rule 3:
+Every invoice must contain a customer or vendor name.
+
+Rule 4:
+The invoice total must be greater than zero.
+
+Rule 5:
+If critical invoice information is missing, the document must be sent for manual review.
+
+Rule 6:
+Invoices with a total amount greater than 100000 require manual approval.
+
+Rule 7:
+The system must not invent missing information. Only information extracted from the document should be used.
+
+Decision Rules:
+
+APPROVED:
+All mandatory information is available and no manual approval rule is triggered.
+
+MANUAL_REVIEW:
+Critical information is missing or the invoice requires manual approval.
+
+REJECTED:
+The document contains invalid or inconsistent mandatory information.
