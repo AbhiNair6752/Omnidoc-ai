@@ -191,9 +191,8 @@ async def main():
         # ====================================================
 
         user_request = """
-Verify PAN ABCDE1234Y for customer C001.
-If the PAN is valid, check whether customer C001
-is eligible for a loan.
+Validate invoice O12345 for customer C001.
+The invoice date is 2026-06-02 and the total amount is 282.00.
 """
 
         # ====================================================

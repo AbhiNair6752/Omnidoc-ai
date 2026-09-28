@@ -4,7 +4,6 @@ import json
 from dotenv import load_dotenv
 
 from langchain_groq import ChatGroq
-from app.schemas.document_schemas import InvoiceData 
 
 load_dotenv()
 
@@ -17,8 +16,10 @@ llm = ChatGroq(
 
 def understand_document(state):
 
-    document_type = state.get("final_document_type",
-                              state["document_type"])
+    document_type = state.get(
+        "final_document_type",
+        state["document_type"]
+    )
 
     extracted_text = state["extracted_text"]
 
@@ -43,47 +44,37 @@ The JSON should contain the relevant fields based on the
 document type.
 """
 
-    if document_type == "invoice":
+    response = llm.invoke(prompt)
 
-        structured_llm = llm.with_structured_output(
-            InvoiceData
+    response_text = response.content.strip()
+
+    if response_text.startswith("```json"):
+        response_text = response_text.replace(
+            "```json",
+            "",
+            1
         )
 
-        result = structured_llm.invoke(prompt)
+    if response_text.endswith("```"):
+        response_text = response_text[:-3]
 
-        structured_data = result.model_dump()
-    else :
+    response_text = response_text.strip()
 
-        response = llm.invoke(prompt)
+    try:
 
-        response_text = response.content.strip()
+        structured_data = json.loads(
+            response_text
+        )
 
-        if response_text.startswith("```json"):
-            response_text = response_text.replace(
-                 "```json",
-        "",
-        1
-            )
+    except json.JSONDecodeError:
 
-        if response_text.endswith("```"):
-              response_text = response_text[:-3]
-
-        response_text = response_text.strip() 
-
-        try:
-
-             structured_data = json.loads(response_text)
-
-        except json.JSONDecodeError:
-
-           structured_data = {
+        structured_data = {
             "raw_response": response_text
         }
 
     return {
         "structured_data": structured_data
     }
-
 
 def verify_document_type(state):
 
@@ -133,3 +124,4 @@ Return ONLY the document type as plain text.
     return {
         "final_document_type": final_document_type
     }
+

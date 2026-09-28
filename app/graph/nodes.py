@@ -27,3 +27,31 @@ def extract_text(state):
     return {
         "extracted_text": extracted_text
     }
+
+
+def route_after_policy(state):
+
+    decision = state.get(
+        "decision",
+        {}
+    )
+
+    policy_decision = decision.get(
+        "decision"
+    )
+
+    print(
+        f"Langgraph: policy decision=",
+        f"{policy_decision}"
+    )
+
+    if policy_decision == "APPROVED":
+        return "approved"
+
+    if policy_decision == "MANUAL_REVIEW":
+        return "manual_review"
+
+    if policy_decision == "REJECTED":
+        return "rejected"
+
+    return "manual_review"

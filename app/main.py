@@ -5,6 +5,7 @@ import shutil
 import uuid
 from app.graph.workflow import build_workflow
 from app.tasks.document_task import process_document_task
+from app.storage import upload_file
 
 app = FastAPI(
     title="OmniDoc AI",
@@ -77,7 +78,6 @@ def health_check():
 
 @app.post("/document/process")
 async def process_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...)
 ):
 
@@ -101,9 +101,21 @@ async def process_document(
             buffer
         )
 
-    task = process_document_background.delay(
+    """task = process_document_task.delay(
         file_path
+    )"""
+
+    s3_key = f"uploads/{unique_filename}"
+
+    upload_file(file_path, s3_key)
+
+    os.remove(file_path)
+
+    task = process_document_task.delay(
+        s3_key
     )
+
+
     """job_id = str(uuid.uuid4())
 
     jobs[job_id] = {
@@ -163,7 +175,7 @@ def get_document_status(
     job_id: str
 ):
 
-    task = process_document_background.AsyncResult(
+    task = process_document_task.AsyncResult(
         job_id
     )
 

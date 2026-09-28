@@ -1,5 +1,6 @@
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
+import os
 
 from qdrant_client import QdrantClient
 
@@ -14,8 +15,7 @@ embedding_model = SentenceTransformer(
 )
 
 client = QdrantClient(
-    host="localhost",
-    port=6333
+    url=os.environ.get("QDRANT_URL", "http://localhost:6333")
 )
 
 COLLECTION_NAME = "omnidoc_policies"

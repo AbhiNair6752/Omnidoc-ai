@@ -1,5 +1,6 @@
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
+import os
 
 COLLECTION_NAME = "omnidoc_policies"
 
@@ -8,8 +9,7 @@ embedding_model = SentenceTransformer(
 )
 
 client = QdrantClient(
-    host="localhost",
-    port=6333
+    url=os.environ.get("QDRANT_URL", "http://localhost:6333")
 )
 
 def retrieve_relevant_chunks(

@@ -16,6 +16,8 @@ class DocumentState(TypedDict, total=False):
 
     relevant_policies: list
 
-    decision: str
+    decision: dict
+
+    mcp_validation_result: dict
 
     error: str

@@ -1,34 +1,49 @@
+import os
+
 from app.worker import celery_app
 from app.graph.workflow import build_workflow
+from app.storage import download_file
 
 workflow = build_workflow()
 
 @celery_app.task
-def process_document_task(image_path: str):
+def process_document_task(s3_key: str):
 
-    initial_state = {
-        "image_path": image_path
-    }
-
-    final_state = workflow.invoke(
-        initial_state
+    local_path = os.path.join(
+        "/tmp",
+        os.path.basename(s3_key)
     )
 
-    return {
-        "document_type":
-            final_state.get("document_type"),
+    download_file(s3_key, local_path)
 
-        "final_document_type":
-            final_state.get("final_document_type"),
+    try:
+        initial_state = {
+            "image_path": local_path
+        }
 
-        "classification_confidence":
-            final_state.get(
-                "classification_confidence"
-            ),
+        final_state = workflow.invoke(
+            initial_state
+        )
 
-        "extracted_text":
-            final_state.get("extracted_text"),
+        return {
+            "document_type":
+                final_state.get("document_type"),
 
-        "structured_data":
-            final_state.get("structured_data")
-    }
+            "final_document_type":
+                final_state.get("final_document_type"),
+
+            "classification_confidence":
+                final_state.get(
+                    "classification_confidence"
+                ),
+
+            "extracted_text":
+                final_state.get("extracted_text"),
+
+            "structured_data":
+                final_state.get("structured_data")
+        }
+
+    finally:
+        if os.path.exists(local_path):
+            os.remove(local_path)

@@ -1,0 +1,92 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - omnidoc-net
+
+  qdrant:
+    image: qdrant/qdrant
+    volumes:
+      - qdrant-data:/qdrant/storage
+    restart: unless-stopped
+    networks:
+      - omnidoc-net
+    ports:
+      - "127.0.0.1:6333:6333"
+
+
+  mcp:
+    image: omnidoc:latest
+    env_file: .env
+    environment:
+      - ENTERPRISE_API_URL=http://enterprise-api:9000
+    depends_on:
+      - enterprise-api
+    command: python -m app.mcp.server
+    restart: unless-stopped
+    networks:
+      - omnidoc-net
+
+  api:
+    image: omnidoc:latest
+    build: .
+    env_file: .env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - MCP_SERVER_URL=http://mcp:8000/mcp
+      - S3_BUCKET=omnidoc-uploads-abhishek-2026
+      - AWS_REGION=ap-south-1
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${USERPROFILE}/.aws:/root/.aws:ro
+    depends_on:
+      - redis
+      - qdrant
+      - mcp
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080
+    restart: unless-stopped
+    networks:
+      - omnidoc-net
+
+  worker:
+    image: omnidoc:latest
+    env_file: .env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - MCP_SERVER_URL=http://mcp:8000/mcp
+      - S3_BUCKET=omnidoc-uploads-abhishek-2026
+      - AWS_REGION=ap-south-1
+    volumes:
+      - ${USERPROFILE}/.aws:/root/.aws:ro
+    depends_on:
+      - redis
+      - qdrant
+      - mcp
+    command: celery -A app.worker worker --loglevel=info --pool=solo
+    restart: unless-stopped
+    networks:
+      - omnidoc-net
+
+  enterprise-api:
+    image: omnidoc:latest
+    command: uvicorn mock_enterprise_api.main:app --host 0.0.0.0 --port 9000
+    restart: unless-stopped
+    networks:
+      - omnidoc-net
+
+networks:
+  omnidoc-net:
+
+volumes:
+  redis-data:
+  qdrant-data:
