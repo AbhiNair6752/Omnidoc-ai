@@ -11,7 +11,7 @@
         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
       },
       "StringLike": {
-        "token.actions.githubusercontent.com:sub": "repo:AbhiNair6752/Omnidoc-ai:*"
+        "token.actions.githubusercontent.com:sub": "repo:AbhiNair6752@305911114/Omnidoc-ai@1340720804:*"
       }
     }
   }]
